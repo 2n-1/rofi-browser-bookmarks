@@ -1,8 +1,27 @@
 from os import path
-from subprocess import check_output, run, STDOUT
-from pathlib import Path
-from subprocess import CalledProcessError
 import json
+
+def get_chrome_bookmark_list(items):
+    def _get_bookmark_list(items, path):
+        return_list = [] 
+
+        if isinstance(items, list):
+            for item in items:
+                return_list += _get_bookmark_list(item, path + "/" + item["name"])
+
+        if isinstance(items, dict):
+            if not (("name" in items) and ("type" in items)):
+                return return_list
+
+            if(items["type"] == "folder"):
+                return_list += _get_bookmark_list(items['children'], path)
+            else:
+                bookmark = items['name'] + " ~ " + items['url']
+                return_list.append(bookmark)
+
+        return return_list
+
+    return _get_bookmark_list(items, "")
 
 class ChromeBookmarksParser:
     def parse(self, folder=None, file_path=None) -> str:
@@ -16,15 +35,10 @@ class ChromeBookmarksParser:
             print("No bookmarks file found!")
             exit()
 
-        bookmarks_json = Path(bookmarks_path).read_text()
-        bookmarks = json.loads(bookmarks_json)
+        with open(bookmarks_path) as file:
+            data = json.load(file)
 
-        options = ""
-        for items in bookmarks['roots']['bookmark_bar']['children']:
-            if (not folder or items['name'] == folder):
-                if 'children' in items:
-                    for bookmark in items['children']:
-                        if 'url' in bookmark:
-                            options = options + bookmark['name'] + "\t" + bookmark['url'] + "\n"
+        bookmark_list = get_chrome_bookmark_list(data['roots']["bookmark_bar"])
 
-        return options
+        return "\n".join(bookmark_list)
+
